@@ -2,6 +2,8 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -68,6 +70,53 @@ func (UH *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(newUser); err != nil {
 		http.Error(w, "Failed do encode user", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (UH *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	idstr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idstr, 10, 64)
+	if err != nil {
+		http.Error(w, "Failed to parse user id", http.StatusInternalServerError)
+		return
+	}
+	err = UH.Repo.DeleteUser(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrUserNotFound):
+			http.Error(w, "User not found", http.StatusNotFound)
+		default:
+			http.Error(w, fmt.Sprintf("Failed to delete user: %v", err), http.StatusBadRequest)
+		}
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+func (UH *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	var user model.User
+	//распарсить id
+	idstr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idstr, 10, 64)
+	if err != nil {
+		http.Error(w, "Failed to parse user id", http.StatusInternalServerError)
+		return
+	}
+	//распарсить тело запроса - достать данные и засунуть в структуру
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		http.Error(w, "Failed to decode user from json", http.StatusBadRequest)
+		return
+	}
+	user.ID = id
+	if err := UH.Repo.UpdateUser(&user); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to update user: %v", err), http.StatusBadRequest)
+		return
+	}
+	//ответ
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(user); err != nil {
+		http.Error(w, "Failed to encode user", http.StatusInternalServerError)
 		return
 	}
 }
