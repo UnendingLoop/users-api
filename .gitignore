@@ -1,0 +1,25 @@
+# Binaries
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary and coverage files
+*.test
+*.out
+*.coverprofile
+*.cover
+
+# IDE/editor configs
+.vscode/
+.idea/
+*.swp
+
+# Build/cache
+/pkg/
+*.log
+
+# Dependency/Vendor
+vendor/

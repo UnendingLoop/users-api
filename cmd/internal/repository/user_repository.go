@@ -2,92 +2,85 @@ package repository
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/UnendingLoop/users-api/cmd/internal/model"
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 )
 
-type UserRepository struct {
-	DB *sqlx.DB
+type GormUserRepository struct {
+	DB *gorm.DB
 }
 
 var ErrUserNotFound = errors.New("user not found")
+var ErrEmailExists = errors.New("email already exists")
+var ErrEmptyfields = errors.New("all fields are empty")
 
-func NewUserRepository(db *sqlx.DB) *UserRepository {
-	return &UserRepository{DB: db}
+func NewGormUserRepository(db *gorm.DB) *GormUserRepository {
+	return &GormUserRepository{DB: db}
 }
 
-func (r *UserRepository) CreateUser(user *model.User) error {
-	res, err := r.DB.Exec("INSERT INTO users(name, surname, email) VALUES (?,?,?)", user.Name, user.Surname, user.Email)
-	if err != nil {
-		return err
-	}
-	user.ID, _ = res.LastInsertId()
-	return nil
+func (r *GormUserRepository) CreateUser(user *model.User) error {
+	return r.DB.Create(user).Error
 }
 
-func (r *UserRepository) GetUserByID(id int64) (*model.User, error) {
+func (r *GormUserRepository) GetUserByID(id int64) (*model.User, error) {
 	var user model.User
-	err := r.DB.Get(&user, "SELECT * FROM users WHERE ID = ?", id)
+	err := r.DB.First(&user, id).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserNotFound
+		}
 		return nil, err
 	}
+
 	return &user, nil
 }
 
-func (r *UserRepository) ListUsers() ([]model.User, error) {
+func (r *GormUserRepository) ListUsers() ([]model.User, error) {
 	var users []model.User
-	err := r.DB.Select(&users, "SELECT * FROM users")
+	err := r.DB.Find(&users).Error
 	return users, err
 }
 
-func (r *UserRepository) DeleteUser(id int64) error {
-	res, err := r.DB.Exec("DELETE FROM users WHERE id = ?", id)
-	if err != nil {
-		return err
-	}
-	if rows, _ := res.RowsAffected(); rows == 0 {
+func (r *GormUserRepository) DeleteUser(id int64) error {
+	res := r.DB.Delete(&model.User{}, id)
+	if res.RowsAffected == 0 {
 		return ErrUserNotFound
 	}
-	return nil
+	return res.Error
 }
 
-func (r *UserRepository) UpdateUser(user *model.User) error {
+func (r *GormUserRepository) UpdateUser(user *model.User) error {
 	//проверка на ненулевой input
 	if user.Email == "" && user.Name == "" && user.Surname == "" {
-		return fmt.Errorf("all fields are empty")
+		return ErrEmptyfields
 	}
 
 	//загрузить из базы юзера с этим id - сразу проверить существует ли такой юзер
 	var dbUser model.User
-	err := r.DB.Get(&dbUser, "SELECT * FROM users WHERE id = ?", user.ID)
+	err := r.DB.First(&dbUser, user.ID).Error
 	if err != nil {
 		return err
 	}
 
-	//проверить наличие нового имейл в базе
-	var existingID int64
-	err = r.DB.Get(&existingID, "SELECT id FROM users WHERE email = ? AND id != ?", user.Email, dbUser.ID)
-	if err == nil || existingID != 0 {
-		return fmt.Errorf("email already exists")
+	//проверить наличие подзаменного имейл в базе
+	if user.Email != "" && user.Email != dbUser.Email {
+		var tmp model.User
+		if err := r.DB.Where("email = ? AND id != ?", user.Email, dbUser.ID).First(&tmp).Error; err != nil {
+			return ErrEmailExists
+		}
 	}
 
-	//скопировать в нулевые поля user поля из dbUser
+	//скопировать ненулевые поля из user в dbUser
 	if user.Name == "" {
-		user.Name = dbUser.Name
+		dbUser.Name = user.Name
 	}
 	if user.Surname == "" {
-		user.Surname = dbUser.Surname
+		dbUser.Surname = user.Surname
 	}
 	if user.Email == "" {
-		user.Email = dbUser.Email
+		dbUser.Email = user.Email
 	}
 
-	//обновить юзера в БД
-	_, err = r.DB.Exec("UPDATE users SET name = ?, surname = ?, email = ?  WHERE id = ?", user.Name, user.Surname, user.Email, user.ID)
-	if err != nil {
-		return fmt.Errorf("failed to update user: %v", err)
-	}
-	return nil
+	return r.DB.Save(&dbUser).Error
 }

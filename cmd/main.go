@@ -13,7 +13,7 @@ import (
 
 func main() {
 	db := config.ConnectDB("app.db")
-	userRepo := repository.NewUserRepository(db)
+	userRepo := repository.NewGormUserRepository(db)
 	userHandler := handler.UserHandler{Repo: userRepo}
 
 	r := chi.NewRouter()
@@ -21,10 +21,8 @@ func main() {
 	r.Get("/users", userHandler.ListUsers)
 	r.Get("/users/{id}", userHandler.GetUserByID)
 	r.Post("/users", userHandler.CreateUser)
-
-	r.Delete("/delete/{id}", func(w http.ResponseWriter, r *http.Request) {})
-	r.Put("/update/{id}", func(w http.ResponseWriter, r *http.Request) {})
-	//3. 🛡 Валидация: защита от пустых полей и дублирующихся email
+	r.Delete("/delete/{id}", userHandler.DeleteUser)
+	r.Put("/update/{id}", userHandler.UpdateUser)
 
 	fmt.Println("Server running on http://localhost:8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {

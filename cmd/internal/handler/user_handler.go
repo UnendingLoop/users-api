@@ -13,7 +13,7 @@ import (
 )
 
 type UserHandler struct {
-	Repo *repository.UserRepository
+	Repo *repository.GormUserRepository
 }
 
 func (UH *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
@@ -109,9 +109,15 @@ func (UH *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	user.ID = id
 	if err := UH.Repo.UpdateUser(&user); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to update user: %v", err), http.StatusBadRequest)
+		switch {
+		case errors.Is(err, repository.ErrEmailExists):
+			http.Error(w, "Email already exists", http.StatusBadRequest)
+		case errors.Is(err, repository.ErrEmptyfields):
+			http.Error(w, "At least one field must not be empty", http.StatusBadRequest)
+		}
 		return
 	}
+
 	//ответ
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
