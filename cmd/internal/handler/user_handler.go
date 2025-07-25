@@ -13,7 +13,7 @@ import (
 )
 
 type UserHandler struct {
-	Repo *repository.GormUserRepository
+	Repo repository.UserRepository
 }
 
 func (UH *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
@@ -78,20 +78,20 @@ func (UH *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	idstr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idstr, 10, 64)
 	if err != nil {
-		http.Error(w, "Failed to parse user id", http.StatusInternalServerError)
+		http.Error(w, "Failed to parse user id", http.StatusInternalServerError) //HTTP 500 Int server error
 		return
 	}
 	err = UH.Repo.DeleteUser(id)
 	if err != nil {
 		switch {
 		case errors.Is(err, repository.ErrUserNotFound):
-			http.Error(w, "User not found", http.StatusNotFound)
+			http.Error(w, "User not found", http.StatusNotFound) //HTTP 404 Not found
 		default:
-			http.Error(w, fmt.Sprintf("Failed to delete user: %v", err), http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("Failed to delete user: %v", err), http.StatusBadRequest) //HTTP 400 Bad request
 		}
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusNoContent) //HTTP 204 No content
 }
 func (UH *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	var user model.User
@@ -111,15 +111,17 @@ func (UH *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	if err := UH.Repo.UpdateUser(&user); err != nil {
 		switch {
 		case errors.Is(err, repository.ErrEmailExists):
-			http.Error(w, "Email already exists", http.StatusBadRequest)
+			http.Error(w, "Email already exists", http.StatusConflict) //HTTP 409 Conflict
 		case errors.Is(err, repository.ErrEmptyfields):
-			http.Error(w, "At least one field must not be empty", http.StatusBadRequest)
+			http.Error(w, "At least one field must not be empty", http.StatusBadRequest) //HTTP 400 Bad request
+		case errors.Is(err, repository.ErrUserNotFound):
+			http.Error(w, "User not found", http.StatusNotFound) //HTTP 404 Not found
 		}
 		return
 	}
 
 	//ответ
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusOK) //HTTP 200 OK
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(user); err != nil {
 		http.Error(w, "Failed to encode user", http.StatusInternalServerError)

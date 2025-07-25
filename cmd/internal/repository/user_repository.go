@@ -7,6 +7,15 @@ import (
 	"gorm.io/gorm"
 )
 
+// UserRepository - интерфейс для мокирования в тестах
+type UserRepository interface {
+	CreateUser(user *model.User) error
+	GetUserByID(id int64) (*model.User, error)
+	ListUsers() ([]model.User, error)
+	DeleteUser(id int64) error
+	UpdateUser(user *model.User) error
+}
+
 type GormUserRepository struct {
 	DB *gorm.DB
 }
@@ -60,7 +69,7 @@ func (r *GormUserRepository) UpdateUser(user *model.User) error {
 	var dbUser model.User
 	err := r.DB.First(&dbUser, user.ID).Error
 	if err != nil {
-		return err
+		return ErrUserNotFound
 	}
 
 	//проверить наличие подзаменного имейл в базе
