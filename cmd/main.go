@@ -24,6 +24,10 @@ func main() {
 	r.Delete("/delete/{id}", userHandler.DeleteUser)
 	r.Put("/update/{id}", userHandler.UpdateUser)
 
+	r.Post("/users/{id1}/make_friend/{id2}", userHandler.MakeFriend)
+	r.Get("/users/{id}/friends", userHandler.GetFriendsList)
+	r.Delete("/users/{id1}/remove_friend/{id2}", userHandler.RemoveFriend)
+
 	fmt.Println("Server running on http://localhost:8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		log.Fatal(err)

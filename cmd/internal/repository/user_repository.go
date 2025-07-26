@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 
 	"github.com/UnendingLoop/users-api/cmd/internal/model"
@@ -9,11 +10,17 @@ import (
 
 // UserRepository - интерфейс для мокирования в тестах
 type UserRepository interface {
-	CreateUser(user *model.User) error
-	GetUserByID(id int64) (*model.User, error)
-	ListUsers() ([]model.User, error)
-	DeleteUser(id int64) error
-	UpdateUser(user *model.User) error
+	CreateUser(user *model.User, ctx context.Context) error
+	GetUserByID(id int64, ctx context.Context) (*model.User, error)
+	ListUsers(ctx context.Context) ([]model.User, error)
+	DeleteUser(id int64, ctx context.Context) error
+	UpdateUser(user *model.User, ctx context.Context) error
+}
+
+type FriendshipRepository interface {
+	AddFriend(user, friend int64, ctx context.Context) error
+	RemoveFriend(user, friend int64, ctx context.Context) error
+	GetFriends(user int64, ctx context.Context) ([]model.User, error)
 }
 
 type GormUserRepository struct {
@@ -28,11 +35,12 @@ func NewGormUserRepository(db *gorm.DB) *GormUserRepository {
 	return &GormUserRepository{DB: db}
 }
 
-func (r *GormUserRepository) CreateUser(user *model.User) error {
-	return r.DB.Create(user).Error
+// User management wethods:
+func (r *GormUserRepository) CreateUser(user *model.User, ctx context.Context) error {
+	return r.DB.WithContext(ctx).Create(&user).Error
 }
 
-func (r *GormUserRepository) GetUserByID(id int64) (*model.User, error) {
+func (r *GormUserRepository) GetUserByID(id int64, ctx context.Context) (*model.User, error) {
 	var user model.User
 	err := r.DB.First(&user, id).Error
 	if err != nil {
@@ -45,13 +53,13 @@ func (r *GormUserRepository) GetUserByID(id int64) (*model.User, error) {
 	return &user, nil
 }
 
-func (r *GormUserRepository) ListUsers() ([]model.User, error) {
+func (r *GormUserRepository) ListUsers(ctx context.Context) ([]model.User, error) {
 	var users []model.User
 	err := r.DB.Find(&users).Error
 	return users, err
 }
 
-func (r *GormUserRepository) DeleteUser(id int64) error {
+func (r *GormUserRepository) DeleteUser(id int64, ctx context.Context) error {
 	res := r.DB.Delete(&model.User{}, id)
 	if res.RowsAffected == 0 {
 		return ErrUserNotFound
@@ -59,7 +67,7 @@ func (r *GormUserRepository) DeleteUser(id int64) error {
 	return res.Error
 }
 
-func (r *GormUserRepository) UpdateUser(user *model.User) error {
+func (r *GormUserRepository) UpdateUser(user *model.User, ctx context.Context) error {
 	//проверка на ненулевой input
 	if user.Email == "" && user.Name == "" && user.Surname == "" {
 		return ErrEmptyfields
@@ -92,4 +100,34 @@ func (r *GormUserRepository) UpdateUser(user *model.User) error {
 	}
 
 	return r.DB.Save(&dbUser).Error
+}
+
+// Friendship management methods:
+func (r *GormUserRepository) AddFriend(user, friend int64, ctx context.Context) error {
+	friendship := model.Friendship{
+		RequesterID: user,
+		AccepterID:  friend,
+	}
+	return r.DB.WithContext(ctx).Create(&friendship).Error
+}
+func (r *GormUserRepository) RemoveFriend(user, friend int64, ctx context.Context) error {
+	friendship := model.Friendship{
+		RequesterID: user,
+		AccepterID:  friend,
+	}
+	return r.DB.WithContext(ctx).Delete(&friendship).Error
+}
+func (r *GormUserRepository) GetFriends(user int64, ctx context.Context) ([]model.User, error) {
+	var friends []model.User
+
+	err := r.DB.WithContext(ctx).
+		Joins("JOIN friendships ON users.id = friendships.accepter").
+		Where("friendships.requester = ?", user).
+		Find(&friends).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return friends, nil
 }

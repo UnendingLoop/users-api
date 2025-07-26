@@ -15,9 +15,12 @@ import (
 type UserHandler struct {
 	Repo repository.UserRepository
 }
+type FriendsHandler struct {
+	Repo repository.FriendshipRepository
+}
 
 func (UH *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := UH.Repo.ListUsers()
+	users, err := UH.Repo.ListUsers(r.Context())
 	if err != nil {
 		http.Error(w, "Failed to fetch users", http.StatusInternalServerError)
 		return
@@ -27,7 +30,6 @@ func (UH *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to encode users", http.StatusInternalServerError)
 	}
 }
-
 func (UH *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	idstr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idstr, 10, 64)
@@ -36,7 +38,7 @@ func (UH *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := UH.Repo.GetUserByID(id)
+	user, err := UH.Repo.GetUserByID(id, r.Context())
 	if err != nil {
 		http.Error(w, "Failed to find user ID", http.StatusNotFound)
 		return
@@ -47,7 +49,6 @@ func (UH *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
 func (UH *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var newUser model.User
 
@@ -61,7 +62,7 @@ func (UH *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := UH.Repo.CreateUser(&newUser); err != nil {
+	if err := UH.Repo.CreateUser(&newUser, r.Context()); err != nil {
 		http.Error(w, "Failed to create user", http.StatusInternalServerError)
 		return
 	}
@@ -73,7 +74,6 @@ func (UH *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
 func (UH *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	idstr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idstr, 10, 64)
@@ -81,7 +81,7 @@ func (UH *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to parse user id", http.StatusInternalServerError) //HTTP 500 Int server error
 		return
 	}
-	err = UH.Repo.DeleteUser(id)
+	err = UH.Repo.DeleteUser(id, r.Context())
 	if err != nil {
 		switch {
 		case errors.Is(err, repository.ErrUserNotFound):
@@ -108,7 +108,7 @@ func (UH *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user.ID = id
-	if err := UH.Repo.UpdateUser(&user); err != nil {
+	if err := UH.Repo.UpdateUser(&user, r.Context()); err != nil {
 		switch {
 		case errors.Is(err, repository.ErrEmailExists):
 			http.Error(w, "Email already exists", http.StatusConflict) //HTTP 409 Conflict
@@ -125,6 +125,61 @@ func (UH *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(user); err != nil {
 		http.Error(w, "Failed to encode user", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (FH *FriendsHandler) MakeFriend(w http.ResponseWriter, r *http.Request) {
+	requester, err := strconv.ParseInt(chi.URLParam(r, "id1"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid user id", http.StatusBadRequest)
+		return
+	}
+	acceptor, err := strconv.ParseInt(chi.URLParam(r, "id2"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	if err := FH.Repo.AddFriend(requester, acceptor, r.Context()); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to make friendship: %v", err), http.StatusInternalServerError)
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+func (FH *FriendsHandler) RemoveFriend(w http.ResponseWriter, r *http.Request) {
+	requester, err := strconv.ParseInt(chi.URLParam(r, "id1"), 10, 64)
+	if err != nil {
+		http.Error(w, "Failed to parse user id", http.StatusInternalServerError) //HTTP 500 Int server error
+		return
+	}
+	acceptor, err := strconv.ParseInt(chi.URLParam(r, "id2"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	if err := FH.Repo.RemoveFriend(requester, acceptor, r.Context()); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to remove friend: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+func (FH *FriendsHandler) GetFriendsList(w http.ResponseWriter, r *http.Request) {
+	requester, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Failed to parse user id", http.StatusInternalServerError) //HTTP 500 Int server error
+		return
+	}
+	friends, err := FH.Repo.GetFriends(requester, r.Context())
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get list of friends: %v", err), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(friends); err != nil {
+		http.Error(w, "Failed to encode users", http.StatusInternalServerError)
 		return
 	}
 }

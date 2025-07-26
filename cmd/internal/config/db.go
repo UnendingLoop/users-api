@@ -9,13 +9,18 @@ import (
 	"gorm.io/gorm"
 )
 
+var models []any = []any{
+	&model.User{},
+	&model.Friendship{},
+}
+
 func ConnectDB(path string) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Cannot open db: %v", err)
 	}
 
-	if err := db.AutoMigrate(&model.User{}); err != nil {
+	if err := db.AutoMigrate(models...); err != nil {
 		log.Fatalf("Failed to migrate: %v", err)
 	}
 
