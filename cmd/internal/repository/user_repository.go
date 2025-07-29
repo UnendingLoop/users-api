@@ -3,24 +3,19 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/UnendingLoop/users-api/cmd/internal/model"
 	"gorm.io/gorm"
 )
 
-// UserRepository - интерфейс для мокирования в тестах
 type UserRepository interface {
 	CreateUser(user *model.User, ctx context.Context) error
 	GetUserByID(id int64, ctx context.Context) (*model.User, error)
 	ListUsers(ctx context.Context) ([]model.User, error)
-	DeleteUser(id int64, ctx context.Context) error
+	DeleteUser(id int64, ctx context.Context) (int64, error)
 	UpdateUser(user *model.User, ctx context.Context) error
-}
-
-type FriendshipRepository interface {
-	AddFriend(user, friend int64, ctx context.Context) error
-	RemoveFriend(user, friend int64, ctx context.Context) error
-	GetFriends(user int64, ctx context.Context) ([]model.User, error)
+	CheckUserExists(id int64, ctx context.Context) error
 }
 
 type GormUserRepository struct {
@@ -29,50 +24,33 @@ type GormUserRepository struct {
 
 var ErrUserNotFound = errors.New("user not found")
 var ErrEmailExists = errors.New("email already exists")
+var ErrUserExists = errors.New("user already exists")
 var ErrEmptyfields = errors.New("all fields are empty")
+var ErrEmptySomeFields = errors.New("some fields are empty")
 
 func NewGormUserRepository(db *gorm.DB) *GormUserRepository {
 	return &GormUserRepository{DB: db}
 }
 
-// User management wethods:
+// User management methods:
 func (r *GormUserRepository) CreateUser(user *model.User, ctx context.Context) error {
 	return r.DB.WithContext(ctx).Create(&user).Error
 }
-
 func (r *GormUserRepository) GetUserByID(id int64, ctx context.Context) (*model.User, error) {
 	var user model.User
 	err := r.DB.First(&user, id).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrUserNotFound
-		}
-		return nil, err
-	}
-
-	return &user, nil
+	return &user, err
 }
-
 func (r *GormUserRepository) ListUsers(ctx context.Context) ([]model.User, error) {
 	var users []model.User
 	err := r.DB.Find(&users).Error
 	return users, err
 }
-
-func (r *GormUserRepository) DeleteUser(id int64, ctx context.Context) error {
+func (r *GormUserRepository) DeleteUser(id int64, ctx context.Context) (int64, error) {
 	res := r.DB.Delete(&model.User{}, id)
-	if res.RowsAffected == 0 {
-		return ErrUserNotFound
-	}
-	return res.Error
+	return res.RowsAffected, res.Error
 }
-
 func (r *GormUserRepository) UpdateUser(user *model.User, ctx context.Context) error {
-	//проверка на ненулевой input
-	if user.Email == "" && user.Name == "" && user.Surname == "" {
-		return ErrEmptyfields
-	}
-
 	//загрузить из базы юзера с этим id - сразу проверить существует ли такой юзер
 	var dbUser model.User
 	err := r.DB.First(&dbUser, user.ID).Error
@@ -102,32 +80,15 @@ func (r *GormUserRepository) UpdateUser(user *model.User, ctx context.Context) e
 	return r.DB.Save(&dbUser).Error
 }
 
-// Friendship management methods:
-func (r *GormUserRepository) AddFriend(user, friend int64, ctx context.Context) error {
-	friendship := model.Friendship{
-		RequesterID: user,
-		AccepterID:  friend,
+func (r *GormUserRepository) CheckUserExists(id int64, ctx context.Context) error {
+	if id < 0 {
+		return fmt.Errorf("invalid ID format")
 	}
-	return r.DB.WithContext(ctx).Create(&friendship).Error
-}
-func (r *GormUserRepository) RemoveFriend(user, friend int64, ctx context.Context) error {
-	friendship := model.Friendship{
-		RequesterID: user,
-		AccepterID:  friend,
+	if _, err := r.GetUserByID(id, ctx); err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			return fmt.Errorf("user %d not found: %v", id, err)
+		}
+		return fmt.Errorf("failed to fetch user: %v", err)
 	}
-	return r.DB.WithContext(ctx).Delete(&friendship).Error
-}
-func (r *GormUserRepository) GetFriends(user int64, ctx context.Context) ([]model.User, error) {
-	var friends []model.User
-
-	err := r.DB.WithContext(ctx).
-		Joins("JOIN friendships ON users.id = friendships.accepter").
-		Where("friendships.requester = ?", user).
-		Find(&friends).Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return friends, nil
+	return nil //если существует, возвращаем nil
 }

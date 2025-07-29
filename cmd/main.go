@@ -8,14 +8,20 @@ import (
 	"github.com/UnendingLoop/users-api/cmd/internal/config"
 	"github.com/UnendingLoop/users-api/cmd/internal/handler"
 	"github.com/UnendingLoop/users-api/cmd/internal/repository"
+	"github.com/UnendingLoop/users-api/cmd/internal/service"
 	"github.com/go-chi/chi/v5"
 )
 
 func main() {
 	db := config.ConnectDB("app.db")
+
 	userRepo := repository.NewGormUserRepository(db)
-	userHandler := handler.UserHandler{Repo: userRepo}
-	friendHandler := handler.FriendsHandler{Repo: userRepo}
+	userService := service.NewUserService(userRepo)
+	userHandler := handler.UserHandler{Repo: userService}
+
+	friendRepo := repository.NewGormFriendRepository(db)
+	friendService := service.NewFriendService(friendRepo, userRepo)
+	friendHandler := handler.FriendHandler{Repo: friendService}
 
 	r := chi.NewRouter()
 

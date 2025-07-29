@@ -9,14 +9,15 @@ import (
 
 	"github.com/UnendingLoop/users-api/cmd/internal/model"
 	"github.com/UnendingLoop/users-api/cmd/internal/repository"
+	"github.com/UnendingLoop/users-api/cmd/internal/service"
 	"github.com/go-chi/chi/v5"
 )
 
 type UserHandler struct {
-	Repo repository.UserRepository
+	Repo service.UserServe
 }
-type FriendsHandler struct {
-	Repo repository.FriendshipRepository
+type FriendHandler struct {
+	Repo service.FriendServe
 }
 
 func (UH *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
@@ -57,13 +58,12 @@ func (UH *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if newUser.Name == "" || newUser.Surname == "" || newUser.Email == "" {
-		http.Error(w, "Missing name or email", http.StatusBadRequest)
-		return
-	}
-
 	if err := UH.Repo.CreateUser(&newUser, r.Context()); err != nil {
-		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+		if errors.Is(err, repository.ErrEmptySomeFields) || errors.Is(err, repository.ErrUserExists) {
+			http.Error(w, fmt.Sprintf("Failed to create user: %v", err), http.StatusBadRequest)
+			return
+		}
+		http.Error(w, fmt.Sprintf("Failed to create user: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -129,7 +129,7 @@ func (UH *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (FH *FriendsHandler) MakeFriend(w http.ResponseWriter, r *http.Request) {
+func (FH *FriendHandler) MakeFriend(w http.ResponseWriter, r *http.Request) {
 	requester, err := strconv.ParseInt(chi.URLParam(r, "id1"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid user id", http.StatusBadRequest)
@@ -147,10 +147,10 @@ func (FH *FriendsHandler) MakeFriend(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 }
-func (FH *FriendsHandler) RemoveFriend(w http.ResponseWriter, r *http.Request) {
+func (FH *FriendHandler) RemoveFriend(w http.ResponseWriter, r *http.Request) {
 	requester, err := strconv.ParseInt(chi.URLParam(r, "id1"), 10, 64)
 	if err != nil {
-		http.Error(w, "Failed to parse user id", http.StatusInternalServerError) //HTTP 500 Int server error
+		http.Error(w, "Failed to parse user id", http.StatusBadRequest)
 		return
 	}
 	acceptor, err := strconv.ParseInt(chi.URLParam(r, "id2"), 10, 64)
@@ -166,7 +166,7 @@ func (FH *FriendsHandler) RemoveFriend(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
-func (FH *FriendsHandler) GetFriendsList(w http.ResponseWriter, r *http.Request) {
+func (FH *FriendHandler) GetFriendsList(w http.ResponseWriter, r *http.Request) {
 	requester, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		http.Error(w, "Failed to parse user id", http.StatusInternalServerError) //HTTP 500 Int server error
