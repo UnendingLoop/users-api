@@ -13,7 +13,12 @@ import (
 )
 
 func main() {
-	db := config.ConnectDB("app.db")
+	//SQLite
+	//db := config.ConnectDB("app.db")
+
+	//PostgresQL
+	dsn := "host=localhost user=fanil password=0123 dbname=sandbox port=5432 sslmode=disable"
+	db := config.ConnectPostgres(dsn)
 
 	userRepo := repository.NewGormUserRepository(db)
 	userService := service.NewUserService(userRepo)

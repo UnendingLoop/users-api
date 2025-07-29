@@ -61,19 +61,19 @@ func (r *GormUserRepository) UpdateUser(user *model.User, ctx context.Context) e
 	//проверить наличие подзаменного имейл в базе
 	if user.Email != "" && user.Email != dbUser.Email {
 		var tmp model.User
-		if err := r.DB.Where("email = ? AND id != ?", user.Email, dbUser.ID).First(&tmp).Error; err != nil {
+		if err := r.DB.Where("email = ? AND id != ?", user.Email, dbUser.ID).First(&tmp).Error; err == nil {
 			return ErrEmailExists
 		}
 	}
 
 	//скопировать ненулевые поля из user в dbUser
-	if user.Name == "" {
+	if user.Name != "" {
 		dbUser.Name = user.Name
 	}
-	if user.Surname == "" {
+	if user.Surname != "" {
 		dbUser.Surname = user.Surname
 	}
-	if user.Email == "" {
+	if user.Email != "" {
 		dbUser.Email = user.Email
 	}
 
@@ -86,9 +86,9 @@ func (r *GormUserRepository) CheckUserExists(id int64, ctx context.Context) erro
 	}
 	if _, err := r.GetUserByID(id, ctx); err != nil {
 		if errors.Is(err, ErrUserNotFound) {
-			return fmt.Errorf("user %d not found: %v", id, err)
+			return fmt.Errorf("user %d not found: %w", id, err)
 		}
-		return fmt.Errorf("failed to fetch user: %v", err)
+		return fmt.Errorf("failed to fetch user: %w", err)
 	}
 	return nil //если существует, возвращаем nil
 }

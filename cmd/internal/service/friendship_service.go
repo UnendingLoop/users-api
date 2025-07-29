@@ -43,7 +43,7 @@ func (FS *FriendServe) AddFriend(user, friend int64, ctx context.Context) error 
 	}
 
 	if err := FS.Repo.AddFriend(user, friend, ctx); err != nil {
-		return fmt.Errorf("failed to add a friend: %v", err)
+		return fmt.Errorf("failed to add a friend: %w", err)
 	}
 	return nil
 }
@@ -59,7 +59,7 @@ func (FS *FriendServe) RemoveFriend(user, friend int64, ctx context.Context) err
 	}
 
 	if err := FS.Repo.RemoveFriend(user, friend, ctx); err != nil {
-		return fmt.Errorf("failed to remove a friend: %v", err)
+		return fmt.Errorf("failed to remove a friend: %w", err)
 	}
 	return nil
 }
