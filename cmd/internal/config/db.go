@@ -15,7 +15,7 @@ var models []any = []any{
 	&model.Friendship{},
 }
 
-func ConnectDB(path string) *gorm.DB {
+func ConnectSQLite(path string) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Cannot open db: %v", err)

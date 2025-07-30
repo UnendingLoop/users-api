@@ -29,21 +29,27 @@ func NewUserService(userRepo repository.UserRepository) UserServe {
 func (US *UserServe) CreateUser(user *model.User, ctx context.Context) error {
 	//валидация входных данных - перенесено из хендлера
 	if user.Name == "" || user.Surname == "" || user.Email == "" {
-		return repository.ErrEmptySomeFields
+		return fmt.Errorf("Failed to create a new user: %w", repository.ErrEmptySomeFields)
 	}
-
+	if err := US.Repo.CheckIfExistsByEmail(user.Email, ctx); !errors.Is(err, repository.ErrEmailNotFound) {
+		return fmt.Errorf("Failed to create a new user: %w", err)
+	}
 	return US.Repo.CreateUser(user, ctx)
 }
 func (US *UserServe) GetUserByID(id int64, ctx context.Context) (*model.User, error) {
-	if err := US.Repo.CheckUserExists(id, ctx); err != nil {
-		return nil, err
+	if id < 0 {
+		return nil, fmt.Errorf("Failed to get user info: invalid ID format")
 	}
+	if err := US.Repo.CheckIfExistsByID(id, ctx); !errors.Is(err, repository.ErrUserExists) {
+		return nil, fmt.Errorf("Failed to get user info: %w", err)
+	}
+
 	user, err := US.Repo.GetUserByID(id, ctx)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, repository.ErrUserNotFound
+			return nil, fmt.Errorf("Failed to get user info: %w", repository.ErrUserNotFound)
 		}
-		return nil, err
+		return nil, fmt.Errorf("Failed to get user info: %w", err)
 	}
 	return user, nil
 }
@@ -66,6 +72,31 @@ func (US *UserServe) UpdateUser(user *model.User, ctx context.Context) error {
 	if user.Email == "" && user.Name == "" && user.Surname == "" {
 		return fmt.Errorf("Failed to update user info: %w", repository.ErrEmptyfields)
 	}
+	//загрузить из базы юзера с этим id - сразу проверить существует ли такой юзер
+	dbUser, err := US.Repo.GetUserByID(user.ID, ctx)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("Failed to update user info: %w", repository.ErrUserNotFound)
+		}
+		return err
+	}
 
-	return US.Repo.UpdateUser(user, ctx)
+	//скопировать ненулевые поля из user в dbUser,в будущем можно добавить нормализацию регистра
+	if user.Name != "" {
+		dbUser.Name = user.Name
+	}
+	if user.Surname != "" {
+		dbUser.Surname = user.Surname
+	}
+	if user.Email != "" {
+		if err := US.Repo.CheckIfExistsByEmail(user.Email, ctx); errors.Is(err, repository.ErrEmailNotFound) {
+			dbUser.Email = user.Email
+		} else {
+			return fmt.Errorf("Failed to update user info: %w", err)
+		}
+	}
+	if err := US.Repo.UpdateUser(dbUser, ctx); err != nil {
+		return fmt.Errorf("Failed to update user info: %w", err)
+	}
+	return nil
 }

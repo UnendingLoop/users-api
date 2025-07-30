@@ -8,8 +8,8 @@ import (
 )
 
 type FriendRepository interface {
-	AddFriend(user, friend int64, ctx context.Context) error
-	RemoveFriend(user, friend int64, ctx context.Context) error
+	AddFriend(friendship *model.Friendship, ctx context.Context) error
+	RemoveFriend(friendship *model.Friendship, ctx context.Context) error
 	GetFriends(user int64, ctx context.Context) ([]model.User, error)
 }
 
@@ -21,19 +21,10 @@ func NewGormFriendRepository(db *gorm.DB) *GormFriendRepository {
 	return &GormFriendRepository{DB: db}
 }
 
-// Friendship management methods:
-func (r *GormFriendRepository) AddFriend(user, friend int64, ctx context.Context) error {
-	friendship := model.Friendship{
-		RequesterID: user,
-		AccepterID:  friend,
-	}
+func (r *GormFriendRepository) AddFriend(friendship *model.Friendship, ctx context.Context) error {
 	return r.DB.WithContext(ctx).Create(&friendship).Error
 }
-func (r *GormFriendRepository) RemoveFriend(user, friend int64, ctx context.Context) error {
-	friendship := model.Friendship{
-		RequesterID: user,
-		AccepterID:  friend,
-	}
+func (r *GormFriendRepository) RemoveFriend(friendship *model.Friendship, ctx context.Context) error {
 	return r.DB.WithContext(ctx).Delete(&friendship).Error
 }
 func (r *GormFriendRepository) GetFriends(user int64, ctx context.Context) ([]model.User, error) {
@@ -44,9 +35,5 @@ func (r *GormFriendRepository) GetFriends(user int64, ctx context.Context) ([]mo
 		Where("friendships.requester = ?", user).
 		Find(&friends).Error
 
-	if err != nil {
-		return nil, err
-	}
-
-	return friends, nil
+	return friends, err
 }
