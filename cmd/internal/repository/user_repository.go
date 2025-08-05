@@ -30,8 +30,10 @@ var ErrUserExists = errors.New("user already exists")
 var ErrEmailExists = errors.New("email already exists")
 var ErrEmailNotFound = errors.New("email not found")
 
-var ErrEmptyfields = errors.New("all fields are empty")
+var ErrEmptyFields = errors.New("all fields are empty")
 var ErrEmptySomeFields = errors.New("some fields are empty")
+
+var ErrUserEqualsFriend = errors.New("user cannot be friend to himself")
 
 func NewGormUserRepository(db *gorm.DB) *GormUserRepository {
 	return &GormUserRepository{DB: db}

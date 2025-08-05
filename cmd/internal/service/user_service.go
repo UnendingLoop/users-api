@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// UserServe
 type UserServe struct {
 	Repo repository.UserRepository
 }
@@ -70,7 +71,7 @@ func (US *UserServe) DeleteUser(id int64, ctx context.Context) error {
 func (US *UserServe) UpdateUser(user *model.User, ctx context.Context) error {
 	//проверка на ненулевой input
 	if user.Email == "" && user.Name == "" && user.Surname == "" {
-		return fmt.Errorf("Failed to update user info: %w", repository.ErrEmptyfields)
+		return fmt.Errorf("Failed to update user info: %w", repository.ErrEmptyFields)
 	}
 	//загрузить из базы юзера с этим id - сразу проверить существует ли такой юзер
 	dbUser, err := US.Repo.GetUserByID(user.ID, ctx)

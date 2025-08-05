@@ -1,0 +1,295 @@
+basePath: /
+definitions:
+  model.Friendship:
+    properties:
+      accepter:
+        $ref: '#/definitions/model.User'
+      accepterID:
+        type: integer
+      createdAt:
+        type: string
+      requester:
+        $ref: '#/definitions/model.User'
+      requesterID:
+        type: integer
+    type: object
+  model.User:
+    properties:
+      email:
+        type: string
+      friendOf:
+        items:
+          $ref: '#/definitions/model.Friendship'
+        type: array
+      friends:
+        items:
+          $ref: '#/definitions/model.Friendship'
+        type: array
+      id:
+        type: integer
+      name:
+        type: string
+      surname:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: REST API для управления пользователями и друзьями
+  title: Users API
+  version: "1.0"
+paths:
+  /delete/{id}:
+    delete:
+      description: Удаляет пользователя по ID из URL
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "404":
+          description: User not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Удаление пользователя по ID
+      tags:
+      - users
+  /update/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Обновляет пользователя по ID из URL, новые данные берутся из тела
+        запроса
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User updated successfully
+          schema:
+            $ref: '#/definitions/model.User'
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "404":
+          description: User not found
+          schema:
+            type: string
+        "409":
+          description: 'Conflict: new email already in use'
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Обновление пользователя по ID
+      tags:
+      - users
+  /users:
+    get:
+      description: Отдает массив из всех пользователей базы
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.User'
+            type: array
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Хендлер для получения списка всех юзеров из базы
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      description: Создаёт нового пользователя из данных в теле запроса
+      parameters:
+      - description: User info
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.User'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.User'
+        "400":
+          description: Incomplete data input
+          schema:
+            type: string
+        "409":
+          description: 'Email conflict: already in use'
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Хендлер для создания нового пользователя
+      tags:
+      - users
+  /users/{id}:
+    get:
+      description: Возвращает пользователя в формате JSON по ID из URL
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+        "404":
+          description: User not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Получение пользователя по ID
+      tags:
+      - users
+  /users/{id}/friends:
+    get:
+      description: Возвращает массив JSON из пользователей, которые состоят в связи
+        с указанным в запросе пользователем
+      parameters:
+      - description: User id - friendship requester
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful load of friends list
+          schema:
+            items:
+              $ref: '#/definitions/model.User'
+            type: array
+        "400":
+          description: Invalid data
+          schema:
+            type: string
+        "404":
+          description: User not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Получение списка друзей пользователя
+      tags:
+      - friendship
+  /users/{id1}/make_friend/{id2}:
+    post:
+      description: Создаёт новую связь между 2мя существующими пользователями
+      parameters:
+      - description: User id 1 - friendship requester
+        in: path
+        name: id1
+        required: true
+        type: integer
+      - description: User id 2 - friendship acceptor
+        in: path
+        name: id2
+        required: true
+        type: integer
+      produces:
+      - text/plain
+      responses:
+        "201":
+          description: Successfully added a new friend
+          schema:
+            type: string
+        "400":
+          description: Invalid data
+          schema:
+            type: string
+        "404":
+          description: One or both users don't exist
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Хендлер для создания новой связи - дружбы
+      tags:
+      - friendship
+  /users/{id1}/remove_friend/{id2}:
+    delete:
+      description: Удаляет существующую связь между 2мя пользователями, id обоих берутся
+        из URL
+      parameters:
+      - description: User id 1 - friendship requester
+        in: path
+        name: id1
+        required: true
+        type: integer
+      - description: User id 2 - friendship acceptor
+        in: path
+        name: id2
+        required: true
+        type: integer
+      produces:
+      - text/plain
+      responses:
+        "204":
+          description: No Content
+          schema:
+            $ref: '#/definitions/model.User'
+        "400":
+          description: Invalid data input
+          schema:
+            type: string
+        "404":
+          description: One or both users don't exist
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Удаление существующей связи - дружбы
+      tags:
+      - friendship
+swagger: "2.0"

@@ -4,20 +4,32 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/UnendingLoop/users-api/cmd/internal/config"
 	"github.com/UnendingLoop/users-api/cmd/internal/handler"
 	"github.com/UnendingLoop/users-api/cmd/internal/repository"
 	"github.com/UnendingLoop/users-api/cmd/internal/service"
+	_ "github.com/UnendingLoop/users-api/docs"
 	"github.com/go-chi/chi/v5"
+	"github.com/joho/godotenv"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
+// @title Users API
+// @version 1.0
+// @description REST API для управления пользователями и друзьями
+// @host localhost:8080
+// @BasePath /
 func main() {
-	//SQLite
-	//db := config.ConnectDB("app.db")
+	if err := godotenv.Load(); err != nil {
+		log.Println("Warning: .env file not found")
+	}
 
-	//PostgresQL
-	dsn := "host=localhost user=fanil password=0123 dbname=sandbox port=5432 sslmode=disable"
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		log.Fatal("DATABASE_URL is not set in env")
+	}
 	db := config.ConnectPostgres(dsn)
 
 	userRepo := repository.NewGormUserRepository(db)
@@ -39,6 +51,8 @@ func main() {
 	r.Post("/users/{id1}/make_friend/{id2}", friendHandler.MakeFriend)
 	r.Get("/users/{id}/friends", friendHandler.GetFriendsList)
 	r.Delete("/users/{id1}/remove_friend/{id2}", friendHandler.RemoveFriend)
+
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
 	fmt.Println("Server running on http://localhost:8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
