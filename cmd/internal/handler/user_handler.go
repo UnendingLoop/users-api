@@ -30,7 +30,7 @@ type UserHandler struct {
 // @Failure      500   {string}  string  "Internal server error"
 // @Failure      409   {string}  string  "Email conflict: already in use"
 // @Router       /users [post]
-func (UH *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
+func (UH UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var newUser model.User
 
 	if err := json.NewDecoder(r.Body).Decode(&newUser); err != nil {
@@ -68,7 +68,7 @@ func (UH *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 // @Success      200   {array}  model.User
 // @Failure      500   {string}  string  "Internal server error"
 // @Router       /users [get]
-func (UH *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+func (UH UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := UH.Repo.ListUsers(r.Context())
 	if err != nil {
 		http.Error(w, "Failed to fetch users", http.StatusInternalServerError)
@@ -91,7 +91,7 @@ func (UH *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 // @Failure      404  {string}  string  "User not found"
 // @Failure      500  {string}  string  "Internal server error"
 // @Router       /users/{id} [get]
-func (UH *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
+func (UH UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	idstr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idstr, 10, 64)
 	if err != nil {
@@ -121,7 +121,7 @@ func (UH *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 // @Failure      400  {string}  string  "Bad request"
 // @Failure      500  {string}  string  "Internal server error"
 // @Router       /delete/{id}	[delete]
-func (UH *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+func (UH UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	idstr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idstr, 10, 64)
 	if err != nil {
@@ -154,7 +154,7 @@ func (UH *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 // @Failure      409  {string}  string  "Conflict: new email already in use"
 // @Failure      500  {string}  string  "Internal server error"
 // @Router       /update/{id}	[put]
-func (UH *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+func (UH UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	var user model.User
 	//распарсить id
 	idStr := chi.URLParam(r, "id")
